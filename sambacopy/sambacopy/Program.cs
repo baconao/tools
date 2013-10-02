@@ -12,19 +12,20 @@ namespace sambacopy
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Executing File Copy...");
+            Console.WriteLine(DateTime.Now.ToLongTimeString() + " - Executing File Copy...");
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
 
-            DirectoryInfo source = new DirectoryInfo(args[0]);
-            DirectoryInfo target = new DirectoryInfo(args[1]);
-
-            CopyFilesRecursively(source, target);
+            //DirectoryInfo source = new DirectoryInfo(args[0]);
+            //DirectoryInfo target = new DirectoryInfo(args[1]);
+            //CopyFilesRecursively(source, target);
+            
+            CopyAllFiles(args[0], args[1]);
 
             stopwatch.Stop();
 
-            Console.WriteLine("File Copy time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
+            Console.WriteLine(DateTime.Now.ToLongTimeString() + " File Copy time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
 
 #if DEBUG
             Console.ReadKey();
@@ -32,11 +33,77 @@ namespace sambacopy
 
         }
 
+
+        public static void CopyAllFiles(string sourceFolder, string destinationFolder)
+        {
+            CopyFiles(sourceFolder, destinationFolder);
+
+            string[] directories = Directory.GetDirectories(sourceFolder, "*", SearchOption.AllDirectories);
+            foreach (string directory in directories)
+            {
+                string targetFolder = String.Format("{0}{1}{2}", destinationFolder, Path.DirectorySeparatorChar, directory.Replace(sourceFolder, ""));
+                CopyFiles(directory, targetFolder);
+            }
+        }
+
+        private static void CopyFiles(string sourceFolder, string destinationFolder)
+        {
+            foreach (string file in Directory.GetFiles(sourceFolder, "*", SearchOption.TopDirectoryOnly))
+            {
+                Directory.CreateDirectory(destinationFolder);
+                string targetFile = Path.Combine(destinationFolder, Path.GetFileName(file));
+                bool doCopy = CheckFileModification(file, targetFile);
+                if (doCopy)
+                {
+                    try
+                    {
+                        File.Copy(file, targetFile, true);
+                        Console.WriteLine("[OK] Copied " + targetFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("!!! Cannot copy " + targetFile + " due to bad weather and " + ex.Message);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("...Skipped " + targetFile);
+                }
+            }
+        }
+
+        private static bool CheckFileModification(string file, string targetFile)
+        {
+            bool doCopy = true;
+
+            if (File.Exists(targetFile))
+            {
+                // compare timestamp - samba does not include the millisecond field / even seconds are not relevant from a backup perspective
+                FileInfo targetPath = new FileInfo(targetFile);
+                FileInfo filePath = new FileInfo(file);
+
+                LimitedDate limitedDate = new LimitedDate();
+                int compare = limitedDate.Compare(filePath.LastWriteTimeUtc, targetPath.LastWriteTimeUtc);
+                if (compare > 0)
+                {
+                    doCopy = true;
+                    File.SetAttributes(targetFile, FileAttributes.Normal);
+                }
+                else
+                {
+                    doCopy = false;
+                }
+            }
+
+            return doCopy;
+        }
+
         // reference: http://www.csharp411.com/c-copy-folder-recursively/
         private static void CopyFilesRecursively(DirectoryInfo source, DirectoryInfo target)
         {
             foreach (DirectoryInfo dir in source.GetDirectories())
             {
+                Console.WriteLine("Checking folder " + dir.FullName);
                 DirectoryInfo targetSubDirectory = target.CreateSubdirectory(dir.Name);
                 CopyFilesRecursively(dir, targetSubDirectory);
             }
@@ -60,6 +127,7 @@ namespace sambacopy
                             int compare = limitedDate.Compare(filePath.LastWriteTimeUtc, targetPath.LastWriteTimeUtc);
                             if (compare > 0)
                             {
+                                doCopy = true;
                                 File.SetAttributes(targetFile, FileAttributes.Normal);
                             }
                             else
@@ -70,17 +138,29 @@ namespace sambacopy
 
                         if (doCopy)
                         {
-                            Directory.CreateDirectory(Path.GetDirectoryName(targetFile));
                             filePath.CopyTo(targetFile, true);
                             lock (Console.Out)
-                                Console.WriteLine("Copied " + targetFile);                            
+                            {
+                                Console.WriteLine("Copied " + targetFile);
+                            }
+                        }
+                        else
+                        {
+                            lock (Console.Out)
+                            {
+                                Console.WriteLine("Skipped " + targetFile);
+                            }
                         }
 
                     });
                 });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                lock (Console.Out)
+                {
+                    Console.WriteLine("Fatal Exception Error " + ex.Message);
+                }
                 throw;
             }
 
