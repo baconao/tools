@@ -24,7 +24,7 @@ namespace sambacopy
             {
                 for (int i = 2; i < args.Length ; i++)
                 {
-                    string flag = args[i];
+                    string flag = args[i].Substring(0, 3);
                     switch (flag)
                     {
                         case "-v1":
@@ -35,6 +35,9 @@ namespace sambacopy
                             break;
                         case "-v2":
                             sambaCopy.Verbosity = SambaCopy.Verbose.High;
+                            break;
+                        case "-x:":
+                            sambaCopy.ExcludeList = args[i].Substring(3).Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries).ToList<string>();
                             break;
                         default:
                             break;
@@ -47,10 +50,6 @@ namespace sambacopy
             stopwatch.Stop();
 
             Console.WriteLine(DateTime.Now.ToLongTimeString() + " File Copy time in milliseconds: {0}", stopwatch.ElapsedMilliseconds);
-
-#if DEBUG
-            Console.ReadKey();
-#endif
 
         }
 

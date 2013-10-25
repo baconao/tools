@@ -16,6 +16,8 @@ namespace sambacopy
 
         public Verbose Verbosity { get; set; }
 
+        public List<string> ExcludeList { get; set; } 
+
         public void CopyAllFiles()
         {
             CopyFiles(SourceFolder, TargetFolder);
@@ -39,19 +41,28 @@ namespace sambacopy
                 {
                     try
                     {
-                        File.Copy(file, targetFile, true);
-                        if (Verbosity != Verbose.None)                            
-                            Console.WriteLine("[OK] Copied " + targetFile);
+                        if (!ExcludeList.Contains(Path.GetFileName(file)))
+                        {
+                            File.Copy(file, targetFile, true);
+                            if (Verbosity != Verbose.None)
+                                Console.WriteLine("[OK] Copied " + targetFile);
+                        }
+                        else
+                        {
+                            if (Verbosity == Verbose.High)
+                                Console.WriteLine("Excluded: " + file);    
+                        }
+                        
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("!!! Cannot copy " + targetFile + " due to bad weather and " + ex.Message);
+                        Console.WriteLine("!!! Cannot copy '" + file + "' due to bad weather and " + ex.Message);
                     }
                 }
                 else
                 {
                     if (Verbosity == Verbose.High)
-                        Console.WriteLine("...Skipped " + targetFile);                        
+                        Console.WriteLine("...Skipped: " + file);                        
                 }
             }
         }
