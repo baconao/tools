@@ -16,7 +16,7 @@ namespace sambacopy
 
         public Verbose Verbosity { get; set; }
 
-        public List<string> ExcludeList { get; set; } 
+        public List<string> ExcludeList { get; set; }
 
         public void CopyAllFiles()
         {
@@ -32,9 +32,51 @@ namespace sambacopy
 
         private void CopyFiles(string sourceFolder, string destinationFolder)
         {
-            foreach (string file in Directory.GetFiles(sourceFolder, "*", SearchOption.TopDirectoryOnly))
+
+            List<string> sourceFiles = Directory.GetFiles(sourceFolder, "*", SearchOption.TopDirectoryOnly).ToList<string>();
+
+            if (Directory.Exists(destinationFolder))
+            {
+                try
+                {
+                    // cleanup                
+                    var targetFileNames = from tf in Directory.GetFiles(destinationFolder, "*", SearchOption.TopDirectoryOnly)
+                                          select Path.GetFileName(tf);
+                    var sourceFileNames = from sf in sourceFiles
+                                          select Path.GetFileName(sf);
+
+                    var filesToDelete = targetFileNames.Except(sourceFileNames);
+
+                    foreach (string fileToDelete in filesToDelete)
+                    {
+                        try
+                        {
+                            File.Delete(Path.Combine(destinationFolder, fileToDelete));
+                        }
+                        catch (Exception ex)
+                        {
+                            if (Verbosity != Verbose.None)
+                                Console.WriteLine("Error on cleanup. Cannot delete file '" + fileToDelete + "' due to: " + ex.Message);
+                        }
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    if (Verbosity != Verbose.None)
+                        Console.WriteLine("Error on cleanup. Cannot delete file(s) on '" + destinationFolder + "' due to: " + ex.Message);
+                }
+
+            }
+            else
             {
                 Directory.CreateDirectory(destinationFolder);
+            }
+
+
+            foreach (string file in sourceFiles)
+            {
+
                 string targetFile = Path.Combine(destinationFolder, Path.GetFileName(file));
                 bool doCopy = CheckFileModification(file, targetFile);
                 if (doCopy)
@@ -50,9 +92,9 @@ namespace sambacopy
                         else
                         {
                             if (Verbosity == Verbose.High)
-                                Console.WriteLine("Excluded: " + file);    
+                                Console.WriteLine("Excluded: " + file);
                         }
-                        
+
                     }
                     catch (Exception ex)
                     {
@@ -62,9 +104,10 @@ namespace sambacopy
                 else
                 {
                     if (Verbosity == Verbose.High)
-                        Console.WriteLine("...Skipped: " + file);                        
+                        Console.WriteLine("...Skipped: " + file);
                 }
             }
+
         }
 
         public bool CheckFileModification(string file, string targetFile)
