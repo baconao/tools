@@ -1,0 +1,1 @@
+Get-ChildItem -Path . -Filter "*.ps1" |  Unblock-File  
