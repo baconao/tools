@@ -28,7 +28,7 @@ namespace CopyByDate
                     continue;
                 }
 
-                ThreadPool.QueueUserWorkItem(new WaitCallback(CopyFile), file);                
+                ThreadPool.QueueUserWorkItem(new WaitCallback(CopyFile), file);
             }
 
             WaitForAllThreadsToComplete();
@@ -45,7 +45,7 @@ namespace CopyByDate
             do
             {
                 Thread.Sleep(500);
-                ThreadPool.GetAvailableThreads(out availThreads, out _);                
+                ThreadPool.GetAvailableThreads(out availThreads, out _);
 
             } while (availThreads < maxThreads);
 
@@ -53,35 +53,45 @@ namespace CopyByDate
 
         private static void CopyFile(object fileParam)
         {
+
             DateTime time;
             string file = fileParam as string;
 
             string fileName = Path.GetFileNameWithoutExtension(file);
 
-            string prefix = "";
-
-            if (fileName.IndexOf("_") == 8)
-            {
-                prefix = fileName.Substring(0, fileName.IndexOf("_"));
-                prefix = String.Format("{0}-{1}-{2}", prefix.Substring(0, 4), prefix.Substring(4, 2), prefix.Substring(6, 2));
-            }
-
-            if (!DateTime.TryParse(prefix, out time))
-            {
-                time = File.GetCreationTime(file);
-            }
-
-            string folderName = RootPath + "\\" + time.Year.ToString() + "_" + time.Month.ToString() + "_" + time.Day.ToString();
-
-            if (!Directory.Exists(folderName))
-            {
-                Directory.CreateDirectory(folderName);
-            }
-
             try
             {
+
+                string prefix = "";
+
+                if (fileName.IndexOf("_") == 8)
+                {
+                    prefix = fileName.Substring(0, fileName.IndexOf("_"));
+                    prefix = String.Format("{0}-{1}-{2}", prefix.Substring(0, 4), prefix.Substring(4, 2), prefix.Substring(6, 2));
+                }
+
+                if (!DateTime.TryParse(prefix, out time))
+                {
+                    time = File.GetCreationTime(file);
+                }
+
+                string folderName = RootPath + "\\" + time.Year.ToString() + "_" + time.Month.ToString() + "_" + time.Day.ToString();
+
+                if (!Directory.Exists(folderName))
+                {
+                    Directory.CreateDirectory(folderName);
+                }
+
                 Console.WriteLine($"Moving: '{file}' to Folder: '{folderName}'");
-                File.Move(file, Path.Combine(folderName, Path.GetFileName(file)));
+                
+                string targetFile = Path.Combine(folderName, Path.GetFileName(file));
+                if (File.Exists(targetFile))
+                    try
+                    {
+                        File.Delete(targetFile);
+                    }
+                    catch { }
+                File.Move(file, targetFile);
             }
             catch (Exception ex)
             {
