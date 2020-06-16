@@ -5,53 +5,87 @@ using System.Text;
 using System.IO;
 using System.Reflection;
 using System.Globalization;
+using System.Threading;
 
 namespace CopyByDate
 {
     class Program
     {
+        public static string RootPath { get; set; }
+
         static void Main(string[] args)
         {
-            string rootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            foreach (string file in Directory.GetFiles(rootPath, "*.*", SearchOption.TopDirectoryOnly))
+            RootPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            // set threadpool
+            ThreadPool.GetMinThreads(out int minThreads, out int minPortThreads);
+            ThreadPool.SetMaxThreads(minThreads * 2, minPortThreads * 2);
+
+            foreach (string file in Directory.GetFiles(RootPath, "*.*", SearchOption.TopDirectoryOnly))
             {
                 if (String.Compare(file, Assembly.GetExecutingAssembly().Location, true) == 0)
                 {
                     continue;
                 }
 
-                DateTime time;
+                ThreadPool.QueueUserWorkItem(new WaitCallback(CopyFile), file);                
+            }
 
-                string fileName = Path.GetFileNameWithoutExtension(file);
+            WaitForAllThreadsToComplete();
 
-                string prefix = "";
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadLine();
 
-                if (fileName.IndexOf("_") == 8)
-                {
-                    prefix = fileName.Substring(0, fileName.IndexOf("_"));
-                    prefix = String.Format("{0}-{1}-{2}", prefix.Substring(0, 4), prefix.Substring(4, 2), prefix.Substring(6, 2));
-                }
-                
-                if (!DateTime.TryParse(prefix, out time))
-                {
-                    time = File.GetCreationTime(file);
-                }
+        }
 
-                string folderName = rootPath + "\\" + time.Year.ToString() + "_" + time.Month.ToString() + "_" + time.Day.ToString();
+        private static void WaitForAllThreadsToComplete()
+        {
+            ThreadPool.GetMaxThreads(out int maxThreads, out _);
+            int availThreads;
+            do
+            {
+                Thread.Sleep(500);
+                ThreadPool.GetAvailableThreads(out availThreads, out _);                
 
-                if (!Directory.Exists(folderName))
-                {
-                    Directory.CreateDirectory(folderName);
-                }
+            } while (availThreads < maxThreads);
 
-                try
-                {
-                    File.Move(file, Path.Combine(folderName, Path.GetFileName(file)));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Cannot move: " + file + " due to: " + ex.Message);
-                }
+        }
+
+        private static void CopyFile(object fileParam)
+        {
+            DateTime time;
+            string file = fileParam as string;
+
+            string fileName = Path.GetFileNameWithoutExtension(file);
+
+            string prefix = "";
+
+            if (fileName.IndexOf("_") == 8)
+            {
+                prefix = fileName.Substring(0, fileName.IndexOf("_"));
+                prefix = String.Format("{0}-{1}-{2}", prefix.Substring(0, 4), prefix.Substring(4, 2), prefix.Substring(6, 2));
+            }
+
+            if (!DateTime.TryParse(prefix, out time))
+            {
+                time = File.GetCreationTime(file);
+            }
+
+            string folderName = RootPath + "\\" + time.Year.ToString() + "_" + time.Month.ToString() + "_" + time.Day.ToString();
+
+            if (!Directory.Exists(folderName))
+            {
+                Directory.CreateDirectory(folderName);
+            }
+
+            try
+            {
+                Console.WriteLine($"Moving: '{file}' to Folder: '{folderName}'");
+                File.Move(file, Path.Combine(folderName, Path.GetFileName(file)));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Cannot move: " + file + " due to: " + ex.Message);
             }
         }
     }
