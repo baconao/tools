@@ -1,4 +1,4 @@
 tools
 =====
 
-some kind of console applications and basic generic tools
+some onsole applications and basic generic tools
